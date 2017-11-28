@@ -2,7 +2,7 @@
 
 for i in `seq 1 $1`;    # generate <flow number> udp flows to, port range 5001 ~ 5000+<flow number>
 do
-    iperf -s -u -p $(($i+5000)) &
+    iperf -s -u -p $(($i+5000)) >/dev/null 2>&1 &
 done
 
 sleep 1

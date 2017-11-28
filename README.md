@@ -4,11 +4,9 @@
     ```$ sudo python lb1in2out.py```
 
 2.Install static rules
-
     ```$ ./ovs_config.sh``` 
 
 3.Start controller
-    
     ```$ ryu-manager controller.py```
 
 4.At mininet open up two terminals at h1 and h2, respectively

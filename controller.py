@@ -36,14 +36,22 @@ class lbController(app_manager.RyuApp):
     def _monitor(self):
         while True:
             if 1 in self.datapaths:
-                self._request_stats(self.datapaths[1])
+                datapath = self.datapaths[1]
+                ofproto = datapath.ofproto
+                parser = datapath.ofproto_parser
+
+                req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
+                datapath.send_msg(req)
+
             hub.sleep(2)
 
     def _request_stats(self, datapath):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
+        match = parser.OFPMatch(in_port=1)
 
-        req = parser.OFPPortStatsRequest(datapath, 0, ofproto.OFPP_ANY)
+        req = parser.OFPFlowStatsRequest(datapath, 0, ofproto.OFPTT_ALL,
+                ofproto.OFPP_ANY, ofproto.OFPG_ANY, 1, 1, match)
         datapath.send_msg(req)
 
     def _add_balance_rule(self, dpid, mac, mac_mask, in_port, out_port):
@@ -131,8 +139,6 @@ class lbController(app_manager.RyuApp):
 
         self.logger.info("trying... mac: " + haddr + " mask: " + mask)
 
-        print haddr
-
         haddr = haddr_to_bin(haddr)
         mask = haddr_to_bin(mask)
         match.set_dl_dst_masked(haddr, mask)
@@ -141,8 +147,8 @@ class lbController(app_manager.RyuApp):
         inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS,
             actions)]
 
-        mod = parser.OFPFlowMod(datapath=datapath, priority=100,
-            match=match, instructions=inst) 
+        mod = parser.OFPFlowMod(datapath=datapath, priority=100, cookie=1,
+                cookie_mask=1, match=match, instructions=inst) 
 
         return haddr, mask
 
@@ -152,10 +158,14 @@ class lbController(app_manager.RyuApp):
 
         global probe_byte_count
 
-        for stat in sorted([flow for flow in body if flow.cookie == 1],
-                           key=lambda flow: (flow.match['in_port'],
-                                             flow.match['eth_dst'])):
+        #for stat in sorted([flow for flow in body if flow.cookie == 1],
+        #                   key=lambda flow: (flow.match['in_port'],
+        #                                     flow.match['eth_dst'])):
+
+        for stat in body:
+            # print "cookie: " + str(stat.cookie)
             probe_byte_count = stat.byte_count
+            print "got : " + str(probe_byte_count)
 
     @set_ev_cls(ofp_event.EventOFPPortStatsReply, MAIN_DISPATCHER)
     def _port_stats_reply_handler(self, ev):
@@ -168,3 +178,4 @@ class lbController(app_manager.RyuApp):
             self.path_data.setdefault(stat.port_no, 0)
             self.logger.info('port %d bandwidth: %d Kbps', stat.port_no, (stat.tx_bytes - self.path_data[stat.port_no])*8/2/1000)
             self.path_data[stat.port_no] = stat.tx_bytes
+
